@@ -272,7 +272,6 @@ function renderBillingTag(record, t) {
 function renderModelName(record, copyText, t, isAdminUser) {
   let other = getLogOther(record.other);
   let modelMapped =
-    isAdminUser &&
     other?.is_model_mapped &&
     other?.upstream_model_name &&
     other?.upstream_model_name !== '';
@@ -300,18 +299,20 @@ function renderModelName(record, copyText, t, isAdminUser) {
                       },
                     })}
                   </div>
-                  <div className='flex items-center'>
-                    <Typography.Text strong style={{ marginRight: 8 }}>
-                      {t('实际模型')}:
-                    </Typography.Text>
-                    {renderModelTag(other.upstream_model_name, {
-                      onClick: (event) => {
-                        copyText(event, other.upstream_model_name).then(
-                          (r) => {},
-                        );
-                      },
-                    })}
-                  </div>
+                  {isAdminUser && (
+                    <div className='flex items-center'>
+                      <Typography.Text strong style={{ marginRight: 8 }}>
+                        {t('实际模型')}:
+                      </Typography.Text>
+                      {renderModelTag(other.upstream_model_name, {
+                        onClick: (event) => {
+                          copyText(event, other.upstream_model_name).then(
+                            (r) => {},
+                          );
+                        },
+                      })}
+                    </div>
+                  )}
                 </Space>
               </div>
             }
