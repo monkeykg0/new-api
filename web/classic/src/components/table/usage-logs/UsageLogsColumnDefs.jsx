@@ -272,6 +272,7 @@ function renderBillingTag(record, t) {
 function renderModelName(record, copyText, t, isAdminUser) {
   let other = getLogOther(record.other);
   let modelMapped =
+    isAdminUser &&
     other?.is_model_mapped &&
     other?.upstream_model_name &&
     other?.upstream_model_name !== '';
