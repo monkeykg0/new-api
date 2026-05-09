@@ -42,7 +42,7 @@ export function getApiKeyFormDefaultValues(
 ): ApiKeyFormValues {
   return {
     ...API_KEY_FORM_DEFAULT_VALUES,
-    group: defaultUseAutoGroup ? 'auto' : DEFAULT_GROUP,
+    group: DEFAULT_GROUP,
     cross_group_retry: defaultUseAutoGroup,
   }
 }
