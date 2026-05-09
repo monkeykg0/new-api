@@ -22,7 +22,7 @@ export const API_ENDPOINTS = {
 } as const
 
 // Default group
-export const DEFAULT_GROUP = 'auto' as const
+export const DEFAULT_GROUP = '' as const
 
 // Default configuration
 export const DEFAULT_CONFIG: PlaygroundConfig = {

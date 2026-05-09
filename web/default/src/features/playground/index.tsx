@@ -68,9 +68,9 @@ export function Playground() {
       : [
           {
             value: DEFAULT_GROUP,
-            label: 'Auto',
+            label: 'Default',
             ratio: 1,
-            desc: 'Circuit Breaker',
+            desc: 'User Default Group',
           },
           ...groupsData,
         ]
