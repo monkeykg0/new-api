@@ -18,6 +18,25 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestEpayCNYAmountQuotesAndCreditsYuan(t *testing.T) {
+	oldRate, oldPrice, oldQuota := operation_setting.USDExchangeRate, operation_setting.Price, common.QuotaPerUnit
+	oldDiscounts := operation_setting.GetPaymentSetting().AmountDiscount
+	operation_setting.USDExchangeRate, operation_setting.Price, common.QuotaPerUnit = 7.3, 7.3, 500000
+	operation_setting.GetPaymentSetting().AmountDiscount = nil
+	t.Cleanup(func() {
+		operation_setting.USDExchangeRate, operation_setting.Price, common.QuotaPerUnit = oldRate, oldPrice, oldQuota
+		operation_setting.GetPaymentSetting().AmountDiscount = oldDiscounts
+	})
+	for _, amount := range []int64{10, 50, 100, 500, 1000, 37} {
+		assert.Equal(t, float64(amount), getEpayPayMoney(amount, "default", true))
+		quota, err := epayCNYQuota(amount)
+		require.NoError(t, err)
+		assert.InDelta(t, float64(amount), float64(quota)/500000*7.3, 0.00001)
+	}
+	_, err := epayCNYQuota(0)
+	require.Error(t, err)
+}
+
 func TestTopUpQuotaValidation(t *testing.T) {
 	oldQuotaPerUnit := common.QuotaPerUnit
 	oldDisplayType := operation_setting.GetGeneralSetting().QuotaDisplayType

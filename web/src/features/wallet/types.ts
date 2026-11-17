@@ -122,6 +122,7 @@ export interface WaffoPayMethod {
 export interface TopupInfo {
   /** Whether online topup is enabled */
   enable_online_topup: boolean
+  epay_cny_amount?: boolean
   /** Whether Stripe topup is enabled */
   enable_stripe_topup: boolean
   /** Available payment methods */
@@ -180,6 +181,7 @@ export interface RedemptionRequest {
  * Payment request parameters
  */
 export interface PaymentRequest {
+  amount_cny?: boolean
   /** Topup amount */
   amount: number
   /** Payment method identifier */
@@ -208,6 +210,7 @@ export interface WaffoPancakePaymentRequest {
  * Amount calculation request
  */
 export interface AmountRequest {
+  amount_cny?: boolean
   /** Topup amount to calculate */
   amount: number
 }
@@ -253,6 +256,7 @@ export type TopupStatus = 'success' | 'pending' | 'expired'
  * Topup billing record
  */
 export interface TopupRecord {
+  payment_provider?: string
   /** Record ID */
   id: number
   /** User ID */

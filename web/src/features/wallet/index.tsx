@@ -84,19 +84,21 @@ export function Wallet(props: WalletProps) {
   const { currency } = useSystemConfig()
   const { topupInfo, presetAmounts, loading: topupLoading } = useTopupInfo()
 
+  const amountCNY = topupInfo?.epay_cny_amount === true
+
   // Calculate effective exchange rate - when display type is USD, use rate of 1
   const effectiveUsdExchangeRate = useMemo(() => {
-    return currency?.quotaDisplayType === 'USD'
+    return amountCNY || currency?.quotaDisplayType === 'USD'
       ? 1
       : currency?.usdExchangeRate || 1
-  }, [currency?.quotaDisplayType, currency?.usdExchangeRate])
+  }, [amountCNY, currency?.quotaDisplayType, currency?.usdExchangeRate])
   const {
     amount: paymentAmount,
     calculating,
     processing,
     calculatePaymentAmount,
     processPayment,
-  } = usePayment()
+  } = usePayment(amountCNY)
   const {
     affiliateLink,
     loading: affiliateLoading,
@@ -142,11 +144,16 @@ export function Wallet(props: WalletProps) {
     if (topupInfo && !topupAmountInitializedRef.current) {
       topupAmountInitializedRef.current = true
       const minTopup = getMinTopupAmount(topupInfo)
-      setTopupAmount(minTopup)
+      const firstPreset = topupInfo.epay_cny_amount
+        ? topupInfo.amount_options.find((amount) => amount >= minTopup)
+        : undefined
+      const initialAmount = firstPreset ?? minTopup
+      setTopupAmount(initialAmount)
+      if (firstPreset !== undefined) setSelectedPreset(firstPreset)
 
       // Calculate initial payment amount with default payment type
       const defaultPaymentType = getDefaultPaymentType(topupInfo)
-      calculatePaymentAmount(minTopup, defaultPaymentType)
+      calculatePaymentAmount(initialAmount, defaultPaymentType)
     }
   }, [topupInfo, calculatePaymentAmount])
 
@@ -315,7 +322,10 @@ export function Wallet(props: WalletProps) {
                   redeeming={redeeming}
                   topupLink={topupInfo?.topup_link}
                   loading={topupLoading}
-                  priceRatio={(status?.price as number) || 1}
+                  priceRatio={
+                    ((status?.price as number) || 1) /
+                    (amountCNY ? currency?.usdExchangeRate || 1 : 1)
+                  }
                   usdExchangeRate={effectiveUsdExchangeRate}
                   onOpenBilling={() => setBillingDialogOpen(true)}
                   creemProducts={topupInfo?.creem_products}
@@ -361,6 +371,7 @@ export function Wallet(props: WalletProps) {
         paymentMethod={selectedPaymentMethod}
         calculating={calculating}
         processing={processing || waffoProcessing || pancakeProcessing}
+        amountCNY={amountCNY}
         discountRate={getDiscountRate()}
         usdExchangeRate={effectiveUsdExchangeRate}
       />

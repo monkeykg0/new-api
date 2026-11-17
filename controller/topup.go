@@ -118,6 +118,7 @@ func GetTopUpInfo(c *gin.Context) {
 		"waffo_min_topup":         setting.WaffoMinTopUp,
 		"waffo_pancake_min_topup": setting.WaffoPancakeMinTopUp,
 		"amount_options":          operation_setting.GetPaymentSetting().AmountOptions,
+		"epay_cny_amount":         isEpayCNYAmountEnabled(),
 		"discount":                operation_setting.GetPaymentSetting().AmountDiscount,
 		"topup_link":              common.TopUpLink,
 	}
@@ -125,12 +126,14 @@ func GetTopUpInfo(c *gin.Context) {
 }
 
 type EpayRequest struct {
+	AmountCNY     bool   `json:"amount_cny"`
 	Amount        int64  `json:"amount"`
 	PaymentMethod string `json:"payment_method"`
 }
 
 type AmountRequest struct {
-	Amount int64 `json:"amount"`
+	Amount    int64 `json:"amount"`
+	AmountCNY bool  `json:"amount_cny"`
 }
 
 func GetEpayClient() *epay.Client {
@@ -147,11 +150,27 @@ func GetEpayClient() *epay.Client {
 	return withUrl
 }
 
-func getPayMoney(amount int64, group string) float64 {
+func isEpayCNYAmountEnabled() bool {
+	return operation_setting.GetPaymentSetting().EpayCNYAmount &&
+		operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeCNY &&
+		operation_setting.USDExchangeRate > 0 && isEpayTopUpEnabled() &&
+		!isStripeTopUpEnabled() && !isWaffoTopUpEnabled() && !isWaffoPancakeTopUpEnabled()
+}
+
+func epayCNYQuota(amount int64) (int, error) {
+	quota := decimal.NewFromInt(amount).
+		Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+		Div(decimal.NewFromFloat(operation_setting.USDExchangeRate))
+	return validateCreditedQuota(quota)
+}
+
+func getEpayPayMoney(amount int64, group string, amountCNY bool) float64 {
 	dAmount := decimal.NewFromInt(amount)
 	// 充值金额以“展示类型”为准：
 	// - USD/CNY: 前端传 amount 为金额单位；TOKENS: 前端传 tokens，需要换成 USD 金额
-	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+	if amountCNY {
+		dAmount = dAmount.Div(decimal.NewFromFloat(operation_setting.USDExchangeRate))
+	} else if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
 		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 		dAmount = dAmount.Div(dQuotaPerUnit)
 	}
@@ -173,6 +192,9 @@ func getPayMoney(amount int64, group string) float64 {
 	dDiscount := decimal.NewFromFloat(discount)
 
 	payMoney := dAmount.Mul(dPrice).Mul(dTopupGroupRatio).Mul(dDiscount)
+	if amountCNY {
+		payMoney = payMoney.Round(2)
+	}
 
 	return payMoney.InexactFloat64()
 }
@@ -267,6 +289,25 @@ func rejectInvalidTopUpQuota(c *gin.Context, userId int, amount int64) bool {
 	return false
 }
 
+func validateEpayAmount(c *gin.Context, amount int64, amountCNY bool) (int, bool) {
+	if !amountCNY {
+		return 0, !rejectInvalidTopUpQuota(c, c.GetInt("id"), amount)
+	}
+	if !isEpayCNYAmountEnabled() {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "人民币充值未启用"})
+		return 0, false
+	}
+	quota, err := epayCNYQuota(amount)
+	if err == nil {
+		err = model.ValidateTopUpQuotaCapacity(c.GetInt("id"), quota)
+	}
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": err.Error()})
+		return 0, false
+	}
+	return quota, true
+}
+
 func RequestEpay(c *gin.Context) {
 	var req EpayRequest
 	err := c.ShouldBindJSON(&req)
@@ -279,7 +320,8 @@ func RequestEpay(c *gin.Context) {
 		return
 	}
 	id := c.GetInt("id")
-	if rejectInvalidTopUpQuota(c, id, req.Amount) {
+	creditedQuota, valid := validateEpayAmount(c, req.Amount, req.AmountCNY)
+	if !valid {
 		return
 	}
 
@@ -288,7 +330,7 @@ func RequestEpay(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "获取用户分组失败"})
 		return
 	}
-	payMoney := getPayMoney(req.Amount, group)
+	payMoney := getEpayPayMoney(req.Amount, group, req.AmountCNY)
 	if payMoney < 0.01 {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "充值金额过低"})
 		return
@@ -324,7 +366,11 @@ func RequestEpay(c *gin.Context) {
 		return
 	}
 	amount := req.Amount
-	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+	provider := model.PaymentProviderEpay
+	if req.AmountCNY {
+		amount = int64(creditedQuota)
+		provider = model.PaymentProviderEpayCNY
+	} else if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
 		dAmount := decimal.NewFromInt(int64(amount))
 		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 		amount = dAmount.Div(dQuotaPerUnit).IntPart()
@@ -335,7 +381,7 @@ func RequestEpay(c *gin.Context) {
 		Money:           payMoney,
 		TradeNo:         tradeNo,
 		PaymentMethod:   req.PaymentMethod,
-		PaymentProvider: model.PaymentProviderEpay,
+		PaymentProvider: provider,
 		CreateTime:      time.Now().Unix(),
 		Status:          common.TopUpStatusPending,
 	}
@@ -496,7 +542,7 @@ func RequestAmount(c *gin.Context) {
 		return
 	}
 	id := c.GetInt("id")
-	if rejectInvalidTopUpQuota(c, id, req.Amount) {
+	if _, valid := validateEpayAmount(c, req.Amount, req.AmountCNY); !valid {
 		return
 	}
 	group, err := model.GetUserGroup(id, true)
@@ -504,7 +550,7 @@ func RequestAmount(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "获取用户分组失败"})
 		return
 	}
-	payMoney := getPayMoney(req.Amount, group)
+	payMoney := getEpayPayMoney(req.Amount, group, req.AmountCNY)
 	if payMoney <= 0.01 {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "充值金额过低"})
 		return

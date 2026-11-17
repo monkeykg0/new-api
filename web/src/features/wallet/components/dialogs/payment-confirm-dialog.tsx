@@ -45,6 +45,7 @@ interface PaymentConfirmDialogProps {
   paymentMethod: PaymentMethod | undefined
   calculating: boolean
   processing: boolean
+  amountCNY?: boolean
   discountRate?: number
   usdExchangeRate?: number
 }
@@ -58,10 +59,15 @@ export function PaymentConfirmDialog({
   paymentMethod,
   calculating,
   processing,
+  amountCNY = false,
   discountRate = DEFAULT_DISCOUNT_RATE,
   usdExchangeRate = 1,
 }: PaymentConfirmDialogProps) {
   const { t } = useTranslation()
+  const formatPaymentAmount = amountCNY
+    ? (amount: number) =>
+        formatLocalCurrencyAmount(amount, { abbreviate: false })
+    : formatCurrency
   const hasDiscount = discountRate > 0 && discountRate < 1 && paymentAmount > 0
   const originalAmount = hasDiscount ? paymentAmount / discountRate : 0
   const discountAmount = hasDiscount ? originalAmount - paymentAmount : 0
@@ -101,11 +107,11 @@ export function PaymentConfirmDialog({
             ) : (
               <div className='flex items-baseline gap-2'>
                 <span className='text-2xl font-semibold'>
-                  {formatCurrency(paymentAmount)}
+                  {formatPaymentAmount(paymentAmount)}
                 </span>
                 {hasDiscount && (
                   <span className='text-muted-foreground text-sm line-through'>
-                    {formatCurrency(originalAmount)}
+                    {formatPaymentAmount(originalAmount)}
                   </span>
                 )}
               </div>
@@ -117,7 +123,7 @@ export function PaymentConfirmDialog({
               <div className='flex items-center justify-between text-sm'>
                 <span className='text-muted-foreground'>{t('You save')}</span>
                 <span className='font-semibold text-green-600'>
-                  {formatCurrency(discountAmount)}
+                  {formatPaymentAmount(discountAmount)}
                 </span>
               </div>
             </div>

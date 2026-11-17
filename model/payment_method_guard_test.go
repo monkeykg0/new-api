@@ -1,12 +1,16 @@
 package model
 
 import (
+	"os"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func insertUserForPaymentGuardTest(t *testing.T, id int, quota int) *User {
@@ -214,6 +218,69 @@ func TestRechargeEpayCreditsQuotaExactlyOnce(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, alreadyDone)
 	assert.Equal(t, 2*500000, getUserQuotaForPaymentGuardTest(t, user.Id))
+}
+
+func TestRechargeEpayCNYCreditsStoredQuota(t *testing.T) {
+	for _, dialect := range []struct {
+		name   string
+		env    string
+		dbType common.DatabaseType
+		driver func(string) gorm.Dialector
+	}{
+		{name: "sqlite"},
+		{"mysql", "TEST_MYSQL_DSN", common.DatabaseTypeMySQL, func(dsn string) gorm.Dialector { return mysql.Open(dsn) }},
+		{"postgres", "TEST_POSTGRES_DSN", common.DatabaseTypePostgreSQL, func(dsn string) gorm.Dialector { return postgres.Open(dsn) }},
+	} {
+		t.Run(dialect.name, func(t *testing.T) {
+			if dialect.env == "" {
+				truncateTables(t)
+			} else {
+				dsn := os.Getenv(dialect.env)
+				if dsn == "" {
+					t.Skip(dialect.env + " not configured")
+				}
+				database, err := gorm.Open(dialect.driver(dsn), &gorm.Config{})
+				require.NoError(t, err)
+				sqlDB, err := database.DB()
+				require.NoError(t, err)
+				t.Cleanup(func() { _ = sqlDB.Close() })
+				// The DSN must point to an isolated test database.
+				require.NoError(t, database.AutoMigrate(&TopUp{}, &User{}, &Log{}))
+				oldDB, oldLogDB := DB, LOG_DB
+				oldMainType, oldLogType := common.MainDatabaseType(), common.LogDatabaseType()
+				DB, LOG_DB = database, database
+				common.SetDatabaseTypes(dialect.dbType, dialect.dbType)
+				initCol()
+				t.Cleanup(func() {
+					DB, LOG_DB = oldDB, oldLogDB
+					common.SetDatabaseTypes(oldMainType, oldLogType)
+					initCol()
+				})
+				var version string
+				require.NoError(t, database.Raw("select version()").Scan(&version).Error)
+				t.Log(version)
+			}
+
+			user := insertUserForPaymentGuardTest(t, 577, 0)
+			const credited = 684932
+			order := TopUp{
+				UserId: user.Id, TradeNo: "EPAY-CNY-10", Amount: credited, Money: 10,
+				PaymentMethod: "usdt", PaymentProvider: PaymentProviderEpayCNY,
+				Status: common.TopUpStatusPending,
+			}
+			require.NoError(t, order.Insert())
+			_, err := RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+			require.ErrorIs(t, err, ErrPaymentMethodMismatch)
+			require.Zero(t, getUserQuotaForPaymentGuardTest(t, user.Id))
+
+			for _, duplicate := range []bool{false, true} {
+				alreadyDone, err := RechargeEpay(order.TradeNo, "usdt", "127.0.0.1")
+				require.NoError(t, err)
+				require.Equal(t, duplicate, alreadyDone)
+				require.Equal(t, credited, getUserQuotaForPaymentGuardTest(t, user.Id))
+			}
+		})
+	}
 }
 
 func TestRechargeEpayKeepsRedisAndDatabaseCreditInSync(t *testing.T) {

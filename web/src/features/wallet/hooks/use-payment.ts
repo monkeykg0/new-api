@@ -62,7 +62,8 @@ const defaultPaymentAmountCalculators: PaymentAmountCalculators = {
 export async function requestPaymentAmount(
   topupAmount: number,
   paymentType: string,
-  calculators: PaymentAmountCalculators = defaultPaymentAmountCalculators
+  calculators: PaymentAmountCalculators = defaultPaymentAmountCalculators,
+  amountCNY = false
 ): Promise<number> {
   let calculator = calculators.regular
   if (isStripePayment(paymentType)) {
@@ -73,7 +74,12 @@ export async function requestPaymentAmount(
     calculator = calculators.waffoPancake
   }
 
-  const response = await calculator({ amount: topupAmount })
+  const response = await calculator({
+    amount: topupAmount,
+    ...(amountCNY && calculator === calculators.regular
+      ? { amount_cny: true }
+      : {}),
+  })
   if (!isApiSuccess(response) || !response.data) {
     return 0
   }
@@ -81,7 +87,7 @@ export async function requestPaymentAmount(
   return Number.parseFloat(response.data)
 }
 
-export function usePayment() {
+export function usePayment(amountCNY = false) {
   const [amount, setAmount] = useState<number>(0)
   const [calculating, setCalculating] = useState(false)
   const [processing, setProcessing] = useState(false)
@@ -93,7 +99,9 @@ export function usePayment() {
         setCalculating(true)
         const calculatedAmount = await requestPaymentAmount(
           topupAmount,
-          paymentType
+          paymentType,
+          defaultPaymentAmountCalculators,
+          amountCNY
         )
         setAmount(calculatedAmount)
         return calculatedAmount
@@ -104,7 +112,7 @@ export function usePayment() {
         setCalculating(false)
       }
     },
-    []
+    [amountCNY]
   )
 
   // Process payment
@@ -124,6 +132,7 @@ export function usePayment() {
           : await requestPayment({
               amount,
               payment_method: paymentType,
+              ...(amountCNY ? { amount_cny: true } : {}),
             })
 
         if (!isApiSuccess(response)) {
@@ -156,7 +165,7 @@ export function usePayment() {
         setProcessing(false)
       }
     },
-    []
+    [amountCNY]
   )
 
   return {
