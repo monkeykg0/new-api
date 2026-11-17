@@ -22,6 +22,7 @@ import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 
 import { installBuildMetadata } from '@/lib/build-metadata'
+import { getSiteFavicon, getSiteName } from '@/lib/constants'
 import { applyFaviconToDom } from '@/lib/dom-utils'
 import '@/lib/dayjs'
 import { initializeFrontendCache } from '@/lib/frontend-cache'
@@ -80,8 +81,10 @@ if (!rootElement) {
     }
     // Cache-first
     const cached = readCachedStatus()
-    if (cached?.system_name) apply(cached.system_name as string)
-    if (cached?.logo) applyFaviconToDom(cached.logo as string)
+    apply(getSiteName(cached?.system_name as string | undefined))
+    if (cached) {
+      applyFaviconToDom(getSiteFavicon(cached.logo as string | undefined))
+    }
 
     // Background refresh through the shared cache. This primes ['status']
     // before React mounts, so the root guard and every status consumer reuse
@@ -90,8 +93,9 @@ if (!rootElement) {
     queryClient
       .ensureQueryData(statusQueryOptions)
       .then((s) => {
-        if (s?.system_name) apply(s.system_name as string)
-        if (s?.logo) applyFaviconToDom(s.logo as string)
+        if (!s) return
+        apply(getSiteName(s.system_name as string | undefined))
+        applyFaviconToDom(getSiteFavicon(s.logo as string | undefined))
       })
       .catch(() => {
         /* empty */

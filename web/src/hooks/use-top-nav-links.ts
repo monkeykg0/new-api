@@ -20,6 +20,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useStatus } from '@/hooks/use-status'
+import { SITE_CANVAS_URL } from '@/lib/constants'
 import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -88,11 +89,22 @@ export function useTopNavLinks(): TopNavLink[] {
 
   // Docs (supports external links)
   if (modules?.docs !== false) {
-    if (docsLink) {
-      links.push({ title: t('Docs'), href: docsLink, external: true })
+    if (docsLink && !/^https:\/\/docs\.newapi\.pro\/?$/.test(docsLink)) {
+      links.push({
+        title: t('Docs'),
+        href: docsLink,
+        external: /^https?:\/\//.test(docsLink),
+      })
     } else {
       links.push({ title: t('Docs'), href: '/docs' })
     }
+  }
+  if (SITE_CANVAS_URL) {
+    links.push({
+      title: t('Infinite Canvas'),
+      href: SITE_CANVAS_URL,
+      external: true,
+    })
   }
 
   // About

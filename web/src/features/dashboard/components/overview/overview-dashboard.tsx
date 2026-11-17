@@ -52,6 +52,7 @@ import { fetchTokenKey, getApiKeys } from '@/features/keys/api'
 import type { ApiKey } from '@/features/keys/types'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { getUserModels } from '@/lib/api'
+import { SITE_CANVAS_URL } from '@/lib/constants'
 import { handleServerError } from '@/lib/handle-server-error'
 import { MOTION_TRANSITION } from '@/lib/motion'
 import { ROLE } from '@/lib/roles'
@@ -72,17 +73,6 @@ import { UptimePanel } from './uptime-panel'
 
 const SETUP_GUIDE_VISIBILITY_STORAGE_KEY =
   'dashboard_overview_setup_guide_expanded'
-
-const SETUP_GUIDE_CODE_PATTERN = [
-  'const request = await client.responses.create({',
-  "  model: 'gpt-4.1-mini',",
-  "  input: 'Start routing traffic',",
-  '})',
-  '',
-  'if (request.output_text) {',
-  '  console.log(request.output_text)',
-  '}',
-].join('\n')
 
 type DashboardActionPath =
   | '/keys'
@@ -181,44 +171,6 @@ function buildCurlCommand(args: {
     `  -H "Authorization: Bearer ${args.apiKey}" \\`,
     `  -d '{"model":"${args.model}","messages":[{"role":"user","content":"Say hello in one sentence."}]}'`,
   ].join('\n')
-}
-
-function SetupGuideBackdrop(props: { compact?: boolean }) {
-  return (
-    <>
-      <div
-        className={cn(
-          'pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_48%_120%_at_78%_0%,color-mix(in_oklch,var(--overview-accent-1)_14%,transparent)_0%,transparent_62%),linear-gradient(112deg,color-mix(in_oklch,var(--card)_94%,var(--overview-accent-2)_6%)_0%,color-mix(in_oklch,var(--card)_94%,var(--overview-accent-3)_6%)_48%,color-mix(in_oklch,var(--background)_90%,var(--overview-accent-1)_10%)_100%)] dark:opacity-60',
-          props.compact
-            ? '[mask-image:linear-gradient(90deg,black_0%,black_48%,transparent_74%)] opacity-55'
-            : 'opacity-85'
-        )}
-        aria-hidden='true'
-      />
-      <div
-        className={cn(
-          'text-foreground/5 dark:text-foreground/8 pointer-events-none absolute inset-y-0 right-0 hidden overflow-hidden font-mono sm:block',
-          props.compact ? 'w-1/2 opacity-45' : 'w-[58%] opacity-75'
-        )}
-        aria-hidden='true'
-      >
-        <pre
-          className={cn(
-            'absolute right-3 [mask-image:linear-gradient(90deg,transparent_0%,black_30%,black_82%,transparent_100%)] text-right tracking-[0.38em] whitespace-pre',
-            props.compact
-              ? '-top-6 text-[9px] leading-4'
-              : 'top-1 text-[11px] leading-5'
-          )}
-        >
-          {SETUP_GUIDE_CODE_PATTERN}
-        </pre>
-      </div>
-      <div
-        className='from-background/35 to-background/70 dark:from-background/20 dark:to-background/80 pointer-events-none absolute inset-0 bg-linear-to-b via-transparent'
-        aria-hidden='true'
-      />
-    </>
-  )
 }
 
 function StartStepItem(props: {
@@ -547,6 +499,12 @@ export function OverviewDashboard() {
         adminOnly: true,
       },
       {
+        title: t('Wallet'),
+        description: t('Check your balance and top-up history'),
+        to: '/wallet',
+        icon: CreditCard,
+      },
+      {
         title: t('Usage Logs'),
         description: t('Inspect requests, errors, and billing details'),
         to: '/usage-logs',
@@ -631,6 +589,12 @@ export function OverviewDashboard() {
     <SectionPageLayout>
       <SectionPageLayout.Title>{t('Overview')}</SectionPageLayout.Title>
       <SectionPageLayout.Actions>
+        {SITE_CANVAS_URL && (
+          <Button size='sm' render={<a href={SITE_CANVAS_URL} />}>
+            {t('Open Infinite Canvas')}
+            <ArrowRight data-icon='inline-end' />
+          </Button>
+        )}
         {setupStatusReady && setupComplete && (
           <Button
             ref={setupGuideToggleRef}
@@ -647,12 +611,13 @@ export function OverviewDashboard() {
       </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
         <div className='flex flex-col gap-4'>
+          <SummaryCards />
+
           <div id={setupGuideId} hidden={!setupGuideExpanded}>
             {setupGuideExpanded && (
               <CardStaggerContainer className='grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'>
                 <CardStaggerItem className='bg-card h-full overflow-hidden rounded-2xl border shadow-xs'>
                   <div className='relative h-full overflow-hidden p-4 sm:p-5'>
-                    <SetupGuideBackdrop />
                     <div className='relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_21rem]'>
                       <div className='flex min-w-0 flex-col gap-5'>
                         <div className='flex flex-wrap items-start justify-between gap-3'>
@@ -664,7 +629,7 @@ export function OverviewDashboard() {
                               />
                               {t('Get started')}
                             </div>
-                            <h3 className='text-xl font-semibold tracking-tight sm:text-2xl'>
+                            <h3 className='font-display text-2xl font-medium tracking-tight sm:text-3xl'>
                               {t('Build on your API gateway in minutes')}
                             </h3>
                             <p className='text-muted-foreground max-w-xl text-sm leading-relaxed'>
@@ -717,7 +682,7 @@ export function OverviewDashboard() {
                       <div className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
                         {t('Recommended actions')}
                       </div>
-                      <h3 className='text-lg font-semibold tracking-tight'>
+                      <h3 className='font-display text-xl font-medium tracking-tight'>
                         {t('Keep the platform ready')}
                       </h3>
                     </div>
@@ -735,7 +700,6 @@ export function OverviewDashboard() {
             <CardStaggerContainer>
               <CardStaggerItem className='bg-card overflow-hidden rounded-2xl border shadow-xs'>
                 <div className='relative overflow-hidden px-4 py-3 sm:px-5'>
-                  <SetupGuideBackdrop compact />
                   <div className='relative flex flex-wrap items-center justify-between gap-3'>
                     <div className='flex min-w-0 items-center gap-3'>
                       <span className='bg-background/70 flex size-9 shrink-0 items-center justify-center rounded-xl border shadow-xs'>
@@ -786,8 +750,6 @@ export function OverviewDashboard() {
               </CardStaggerItem>
             </CardStaggerContainer>
           )}
-
-          <SummaryCards />
 
           {showContentPanels && (
             <CardStaggerContainer

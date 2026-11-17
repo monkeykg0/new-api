@@ -39,6 +39,7 @@ export interface PricingTableProps {
   tokenUnit?: TokenUnit
   showRechargePrice?: boolean
   selectedGroup?: string
+  showPagination?: boolean
   onModelClick?: (modelName: string) => void
 }
 
@@ -109,7 +110,9 @@ export function PricingTable(props: PricingTableProps) {
         )}
       />
 
-      {!isLoading && models.length > 0 && <DataTablePagination table={table} />}
+      {props.showPagination !== false && !isLoading && models.length > 0 && (
+        <DataTablePagination table={table} />
+      )}
     </div>
   )
 }

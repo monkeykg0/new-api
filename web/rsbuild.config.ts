@@ -53,6 +53,13 @@ export default defineConfig(({ envMode }) => {
       },
     },
     source: {
+      define: {
+        'import.meta.env.VITE_REACT_APP_CANVAS_URL': JSON.stringify(
+          process.env.VITE_REACT_APP_CANVAS_URL ||
+            env.rawPublicVars.VITE_REACT_APP_CANVAS_URL ||
+            ''
+        ),
+      },
       entry: {
         index: './src/main.tsx',
       },
