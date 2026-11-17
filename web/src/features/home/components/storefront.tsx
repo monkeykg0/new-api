@@ -90,7 +90,13 @@ export function Storefront() {
               <Button
                 className='h-11 px-4'
                 variant='outline'
-                render={<a href={SITE_CANVAS_URL} target='_blank' rel='noopener noreferrer' />}
+                render={
+                  <a
+                    href={SITE_CANVAS_URL}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                  />
+                }
               >
                 {t('Open Infinite Canvas')}
                 <ArrowUpRight data-icon='inline-end' />

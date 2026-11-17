@@ -590,7 +590,16 @@ export function OverviewDashboard() {
       <SectionPageLayout.Title>{t('Overview')}</SectionPageLayout.Title>
       <SectionPageLayout.Actions>
         {SITE_CANVAS_URL && (
-          <Button size='sm' render={<a href={SITE_CANVAS_URL} />}>
+          <Button
+            size='sm'
+            render={
+              <a
+                href={SITE_CANVAS_URL}
+                target='_blank'
+                rel='noopener noreferrer'
+              />
+            }
+          >
             {t('Open Infinite Canvas')}
             <ArrowRight data-icon='inline-end' />
           </Button>

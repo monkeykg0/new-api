@@ -139,7 +139,16 @@ function ConnectionDocs() {
               </li>
             </ol>
             {SITE_CANVAS_URL && (
-              <Button className='mt-4' render={<a href={SITE_CANVAS_URL} />}>
+              <Button
+                className='mt-4'
+                render={
+                  <a
+                    href={SITE_CANVAS_URL}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                  />
+                }
+              >
                 {t('Open Infinite Canvas')}
               </Button>
             )}
